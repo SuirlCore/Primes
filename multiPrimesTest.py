@@ -7,8 +7,7 @@ import keyboard                     #detects if a key is pressed
 
 #database connection information. hostname, username, password, database name.
 #change to ask user for username and password before implimentation.
-databaseHost = ["192.168.1.148", "", "", ""]
-
+databaseHost = ["127.0.0.1", "root", "letmeinnow", "primes"]
 
 # -----------------------------
 # functions for multi threading
