@@ -11,7 +11,7 @@ databaseHost = ["127.0.0.1", "root", "letmeinnow", "primes"]
 
 #grab the computers username from the user
 print("What name would you like this instance to use?")
-userInput = input()
+userNameInput = input()
 
 # -----------------------------
 # functions for multi threading
@@ -62,7 +62,7 @@ def userInput():
 def hostName():
     #This code grabs the computers information that the user provided at the beginning of the program
     userName = []
-    userName.append(userInput)
+    userName.append(userNameInput)
 
     #This code will grab the computers host name and ip address to use
     #print("Looking for computers host name\n")
