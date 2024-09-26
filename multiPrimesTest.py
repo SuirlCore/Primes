@@ -119,7 +119,7 @@ def multiLoadRange():
     for x in lastRange:		#lastRange is a list of tuples. iterates through to grab an int.
         for y in x:
             lastRangeInt = y
-            
+
     #if no range in inProgress, grab last prime found and add 1 and 100
     if lastRangeInt == None:
         sqlInput = "SELECT MAX(multiPrimeNum) as lastPrime FROM multiPrimes;"
@@ -136,6 +136,27 @@ def multiLoadRange():
     userName = hostName()
     sqlInput = "INSERT INTO inProgress (userID, numStartChecking, numEndChecking) VALUES ('" + str(userName[0]) + "', " + str(currentRangeStart) + ", " + str(currentRangeEnd) + ");"
     multiUpdate(sqlInput)
+
+    #double check that no other instance has the same range as the one just grabbed
+    testCase = 1
+    while testCase == 1:
+        sqlInput = "SELECT Count(" + currentRangeStart + ") AS result FROM inProgress GROUP BY numStartChecking WHERE numStartChecking = " +  currentRangeStart + ";"
+        isRangeUnique = multiSelect(sqlInput)
+        if isRangeUnique > 1:         
+            #add new range to be checked to inProgress table
+            if lastRangeInt == None:
+                lastRangeInt = 0
+            currentRangeStart = lastRangeInt + 1
+            currentRangeEnd = currentRangeStart + 100
+            userName = hostName()
+            sqlInput = "INSERT INTO inProgress (userID, numStartChecking, numEndChecking) VALUES ('" + str(userName[0]) + "', " + str(currentRangeStart) + ", " + str(currentRangeEnd) + ");"
+            multiUpdate(sqlInput)
+        elif isRangeUnique == 1:
+            testCase = 0            
+            
+    code needs to go here
+
+
     return currentRangeStart
 
 #function to save found prime to the database
