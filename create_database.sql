@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS primes (
 
 CREATE TABLE IF NOT EXISTS multiPrimes (
 	multiPrimeID int NOT NULL AUTO_INCREMENT,
-	userID char(30),
+	userID varchar(60),
   	primeIndex int,
 	multiPrimeNum int NOT NULL,
     PRIMARY KEY (multiPrimeID)
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS multiPrimes (
 
 CREATE TABLE IF NOT EXISTS inProgress (
 	instanceID int NOT NULL AUTO_INCREMENT,
-  	userID char(30) NOT NULL,
+  	userID varchar(60) NOT NULL,
 	numStartChecking int NOT NULL,
 	numEndChecking int NOT NULL,
     PRIMARY KEY (instanceID)
