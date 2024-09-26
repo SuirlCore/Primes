@@ -9,6 +9,10 @@ import keyboard                     #detects if a key is pressed
 #change to ask user for username and password before implimentation.
 databaseHost = ["127.0.0.1", "root", "letmeinnow", "primes"]
 
+#grab the computers username from the user
+print("What name would you like this instance to use?")
+userInput = input()
+
 # -----------------------------
 # functions for multi threading
 # -----------------------------
@@ -56,11 +60,17 @@ def userInput():
 
 #function to find current users IP and localhost name. returns userName[] index 0 = name, index 1 = IP
 def hostName():
-    print("Looking for computers host name\n")
-    hname=socket.gethostname()
+    #This code grabs the computers information that the user provided at the beginning of the program
     userName = []
-    userName.append(socket.gethostname())
-    userName.append(socket.gethostbyname(hname))
+    userName.append(userInput)
+
+    #This code will grab the computers host name and ip address to use
+    #print("Looking for computers host name\n")
+    #hname=socket.gethostname()
+    #userName = []
+    #userName.append(socket.gethostname())
+    #userName.append(socket.gethostbyname(hname))
+    
     return userName
     
 #function to select items from database. takes in the SQL query as a variable. outputs the result
