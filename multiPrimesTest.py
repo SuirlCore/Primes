@@ -5,9 +5,13 @@ from datetime import datetime       #used to find current time for tracking how 
 import threading                    #used to create multiple threads for event based programming.
 import keyboard                     #detects if a key is pressed
 
+#find out from the user where the database is at
+print("what is the IP address for the database? If it is localhost please enter 127.0.0.1")
+databaseIp = input()
+
 #database connection information. hostname, username, password, database name.
 #change to ask user for username and password before implimentation.
-databaseHost = ["127.0.0.1", "root", "letmeinnow", "primes"]
+databaseHost = [databaseIp, "root", "letmeinnow", "primes"]
 
 #grab the computers username from the user
 print("What name would you like this instance to use?")
