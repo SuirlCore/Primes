@@ -182,7 +182,7 @@ def multiLoadRange():
             multiUpdate(sqlInput)
 
         #if there is only one unique case then break the loop and do nothing
-        elif isRangeUniqueInt == 1:
+        elif isRangeUniqueInt == 0:
             testCase = 0            
 
     return currentRangeStart
