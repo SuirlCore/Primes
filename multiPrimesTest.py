@@ -142,7 +142,7 @@ def multiLoadRange():
     testCase = 1
     while testCase == 1:
         #grab the last two ranges being checked
-        sqlInput = "SELECT MAX(numStartChecking) as secondMax FROM inProgress WHERE numStartChecking NOT IN (SELECT Max (numStartChecking) FROM inProgress);"
+        sqlInput = "SELECT MAX(numStartChecking) as secondMax FROM inProgress WHERE numStartChecking NOT IN (SELECT Max(numStartChecking) FROM inProgress);"
         secondMaxRange = multiSelect(sqlInput)
         for x in secondMaxRange:		#isRangeUnique is a list of tuples. iterates through to grab an int.
             for y in x:
