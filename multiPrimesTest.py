@@ -154,8 +154,8 @@ def multiLoadRange():
                 maxInt = y
 
         #check if the max and secondMax overlap
-        print("maxInt = " + maxInt)
-        print("secondMaxInt = " + secondMaxInt)
+        print("maxInt = " + str(maxInt))
+        print("secondMaxInt = " + str(secondMaxInt))
         if maxInt <= (secondMaxInt + 100):
             isRangeUniqueInt = 1    #ranges overlap, need a new range
             print("test shows there are multiple ranges")
