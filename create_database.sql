@@ -48,5 +48,5 @@ INSERT INTO multiPrimes (multiPrimeNum)
 	VALUES (5);
 
 -- needed to fix testing for multiple ranges in the same order when first starting database. Test in multiLoadRange()
-INSERT INTO inProgress (userID, numStartChecking)
-	VALUES (testCase, 1);
+INSERT INTO inProgress (userID, numStartChecking, numEndChecking)
+	VALUES ('testCase', 1, 1);
