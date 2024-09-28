@@ -156,12 +156,14 @@ def multiLoadRange():
         #check if the max and secondMax overlap by 101
         if maxInt <= secondMaxInt + 100:
             isRangeUniqueInt = 2    #ranges overlap, need a new range
+            print("test shows range is unique")
         else:
             isRangeUniqueInt = 1    #ranges do not overlap. all good.
+            print("test shows there are multiple ranges")
 
         #if there are multiple instances of the last range being checked then do this
         if isRangeUniqueInt > 1: 
-
+            print("adding the next range.")
             sqlInput = "SELECT MAX(multiPrimeNum) as lastPrime FROM multiPrimes;"
             lastRange = multiSelect(sqlInput)
             for x in lastRange:		#lastPrime is a list of tuples. iterates through to grab an int.
