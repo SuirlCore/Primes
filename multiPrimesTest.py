@@ -137,12 +137,37 @@ def multiLoadRange():
     sqlInput = "INSERT INTO inProgress (userID, numStartChecking, numEndChecking) VALUES ('" + str(userName[0]) + "', " + str(currentRangeStart) + ", " + str(currentRangeEnd) + ");"
     multiUpdate(sqlInput)
 
-    #double check that no other instance has the same range as the one just grabbed
+    #there can be cases where multiple program instances grab the same range to be checked at the same time. We need to ensure this does not happen.
+    #double check that no other instance has the same range as the one just grabbed.
     testCase = 1
     while testCase == 1:
-        sqlInput = "SELECT Count(" + currentRangeStart + ") AS result FROM inProgress GROUP BY numStartChecking WHERE numStartChecking = " +  currentRangeStart + ";"
-        isRangeUnique = multiSelect(sqlInput)
-        if isRangeUnique > 1:         
+        #grab the last two ranges being checked
+        sqlInput = "SELECT MAX (numStartChecking) FROM inProgress WHERE numStartChecking NOT IN (SELECT Max (numStartChecking) FROM inProgress);"
+        secondMaxRange = multiSelect(sqlInput)
+        for x in secondMaxRange:		#isRangeUnique is a list of tuples. iterates through to grab an int.
+            for y in x:
+                secondMaxInt = y
+        sqlInput = "SELECT Max (numStartChecking) FROM inProgress;"
+        maxRange = multiSelect(sqlInput)
+        for x in maxRange:		#isRangeUnique is a list of tuples. iterates through to grab an int.
+            for y in x:
+                maxInt = y
+
+        #check if the max and secondMax overlap by 101
+        if maxInt <= secondMaxInt + 100:
+            isRangeUniqueInt = 2    #ranges overlap, need a new range
+        else:
+            isRangeUniqueInt = 1    #ranges do not overlap. all good.
+
+        #if there are multiple instances of the last range being checked then do this
+        if isRangeUniqueInt > 1: 
+
+            sqlInput = "SELECT MAX(multiPrimeNum) as lastPrime FROM multiPrimes;"
+            lastRange = multiSelect(sqlInput)
+            for x in lastRange:		#lastPrime is a list of tuples. iterates through to grab an int.
+                for y in x:
+                    lastRangeInt = y
+
             #add new range to be checked to inProgress table
             if lastRangeInt == None:
                 lastRangeInt = 0
@@ -151,11 +176,11 @@ def multiLoadRange():
             userName = hostName()
             sqlInput = "INSERT INTO inProgress (userID, numStartChecking, numEndChecking) VALUES ('" + str(userName[0]) + "', " + str(currentRangeStart) + ", " + str(currentRangeEnd) + ");"
             multiUpdate(sqlInput)
-        elif isRangeUnique == 1:
-            testCase = 0            
-            
-    code needs to go here
 
+        #if there is only one unique case then break the loop and do nothing
+        elif isRangeUniqueInt == 1:
+        
+            testCase = 0            
 
     return currentRangeStart
 
