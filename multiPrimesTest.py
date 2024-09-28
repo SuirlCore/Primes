@@ -153,15 +153,20 @@ def multiLoadRange():
             for y in x:
                 maxInt = y
 
-        #check if the max and secondMax overlap
-        print("maxInt = " + str(maxInt))
-        print("secondMaxInt = " + str(secondMaxInt))
-        if maxInt <= (secondMaxInt + 100):
-            isRangeUniqueInt = 1    #ranges overlap, need a new range
-            print("test shows there are multiple ranges")
-        elif maxInt > (secondMaxInt + 100):
-            isRangeUniqueInt = 0    #ranges do not overlap. all good.
-            print("test shows range is unique")
+        if secondMaxInt == 1:
+            #when database is first created, there is no second range to test against, so we skip this test entirely.
+            isRangeUniqueInt = 0
+            print("First range is being tested")
+        elif secondMaxInt != 1:
+            #check if the max and secondMax overlap
+            print("maxInt = " + str(maxInt))
+            print("secondMaxInt = " + str(secondMaxInt))
+            if maxInt <= (secondMaxInt + 100):
+                isRangeUniqueInt = 1    #ranges overlap, need a new range
+                print("test shows there are multiple ranges")
+            elif maxInt > (secondMaxInt + 100):
+                isRangeUniqueInt = 0    #ranges do not overlap. all good.
+                print("test shows range is unique")
 
         #if there are multiple instances of the last range being checked then do this
         if isRangeUniqueInt == 1: 
