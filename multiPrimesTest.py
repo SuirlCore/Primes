@@ -5,13 +5,28 @@ from datetime import datetime       #used to find current time for tracking how 
 import threading                    #used to create multiple threads for event based programming.
 import keyboard                     #detects if a key is pressed
 
-#find out from the user where the database is at
-print("what is the IP address for the database? If it is localhost please enter 127.0.0.1")
-databaseIp = input()
-
 #database connection information. hostname, username, password, database name.
-#change to ask user for username and password before implimentation.
-databaseHost = [databaseIp, "root", "letmeinnow", "primes"]
+#gather login information for the database
+print("Enter location of the database to be used:")
+print("1 - localhost")
+print("2 - Odin @ 192.168.1.39 (On HufflepuffCommonroom wifi)")
+print("3 - Odin @ ? (On Speed-Racer wifi)")
+print("4 - Other location")
+databaseLocation = input()
+if databaseLocation == "1":
+    databaseHost = ["127.0.0.1", "root", "letmeinnow", "primes"]
+elif databaseLocation == "2":
+    databaseHost = ["192.168.1.39", "suirl", "letmeinnow", "primes"]
+elif databaseLocation == "3":
+    databaseHost = ["?", "suirl", "letmeinnow", "primes"]
+elif databaseLocation == "4":
+    print("Please enter the IP address for the database")
+    databaseIPAddress = input()
+    print("What is the username for the database?")
+    databaseUsername = input()
+    print("What is the password for the database?")
+    databasePassword = input()
+    databaseHost = [databaseIPAddress, databaseUsername, databasePassword, "primes"]
 
 #grab the computers username from the user
 print("What name would you like this instance to use?")
