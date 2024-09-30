@@ -8,10 +8,11 @@ import keyboard                     #detects if a key is pressed
 #database connection information. hostname, username, password, database name.
 #gather login information for the database
 print("Enter location of the database to be used:")
-print("1 - localhost")
+print("1 - Localhost from BadPenny")
 print("2 - Odin @ 192.168.1.39 (On HufflepuffCommonroom wifi)")
 print("3 - Odin @ ? (On Speed-Racer wifi)")
-print("4 - Other location")
+print("4 - Bad Penny 192.168.1.74 (On HufflepuffCommonroom wifi)")
+print("5 - Other location")
 databaseLocation = input()
 if databaseLocation == "1":
     databaseHost = ["127.0.0.1", "root", "letmeinnow", "primes"]
@@ -20,6 +21,8 @@ elif databaseLocation == "2":
 elif databaseLocation == "3":
     databaseHost = ["?", "suirl", "letmeinnow", "primes"]
 elif databaseLocation == "4":
+    databaseHost = ["192.168.1.74", "root", "letmeinnow", "primes"]
+elif databaseLocation == "5":
     print("Please enter the IP address for the database")
     databaseIPAddress = input()
     print("What is the username for the database?")
