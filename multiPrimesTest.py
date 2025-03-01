@@ -2,8 +2,7 @@ import mysql.connector
 import socket			    #used to find IP address and hostname for userID in multi user mode
 import time			    #used for testing, slows program down by 1 second per number
 from datetime import datetime       #used to find current time for tracking how long a user has been calculating
-import threading                    #used to create multiple threads for event based programming.
-import keyboard                     #detects if a key is pressed
+import psutil
 
 #set the database variables
 databaseHost = ["127.0.0.1", "suirl", "letmeinnow", "primes"]
@@ -39,14 +38,30 @@ def calculating():
                 print("New prime found: " + str(newTest))
                 multiSavePrime(newTest)
 
-            #slow things down a bit. pauses by 1/10th of a second after each calculation
-            time.sleep(.1)
+            #slow things down a bit.
+            sleep_time = adjust_sleep_time(target_cpu=40)
+            time.sleep(sleep_time)
 
         #edit the database to show the range has been completed
         sqlInput = "UPDATE inProgress SET inProgress = '0' WHERE userID = '" + userNameInput + "';"
         multiUpdate(sqlInput)
 
 
+#adjusts the sleep time dynamicaly to keep cpu load at 40%
+def adjust_sleep_time(target_cpu=40, min_sleep=0.001, max_sleep=1.0, smoothing=0.1):
+
+    if not hasattr(adjust_sleep_time, "sleep_time"):
+        adjust_sleep_time.sleep_time = 0.1  # Initial sleep time
+
+    cpu_usage = psutil.cpu_percent(interval=0.1)
+
+    error = target_cpu - cpu_usage  # Difference between target and actual usage
+    adjust_sleep_time.sleep_time += smoothing * (error / 100)  # Adjust sleep time
+
+    # Clamp the sleep time within min/max bounds
+    adjust_sleep_time.sleep_time = max(min_sleep, min(max_sleep, adjust_sleep_time.sleep_time))
+
+    return adjust_sleep_time.sleep_time
 
 
 # -------------------------------------------------------------------------------------
