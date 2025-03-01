@@ -48,20 +48,20 @@ def calculating():
 
 
 #adjusts the sleep time dynamicaly to keep cpu load at 40%
-def adjust_sleep_time(target_cpu=40, min_sleep=0.001, max_sleep=1.0, smoothing=0.1):
+def adjust_sleep_time(target_cpu=40, decrease_step=0.005, increase_step=0.01, min_sleep=0.005, max_sleep=1.0):
 
     if not hasattr(adjust_sleep_time, "sleep_time"):
-        adjust_sleep_time.sleep_time = 0.1  # Initial sleep time
+        adjust_sleep_time.sleep_time = 0.1  # Start with 0.1 seconds
 
     cpu_usage = psutil.cpu_percent(interval=0.1)
 
-    error = target_cpu - cpu_usage  # Difference between target and actual usage
-    adjust_sleep_time.sleep_time += smoothing * (error / 100)  # Adjust sleep time
-
-    # Clamp the sleep time within min/max bounds
-    adjust_sleep_time.sleep_time = max(min_sleep, min(max_sleep, adjust_sleep_time.sleep_time))
+    if cpu_usage < target_cpu:
+        adjust_sleep_time.sleep_time = max(min_sleep, adjust_sleep_time.sleep_time - decrease_step)
+    else:
+        adjust_sleep_time.sleep_time = min(max_sleep, adjust_sleep_time.sleep_time + increase_step)
 
     return adjust_sleep_time.sleep_time
+
 
 
 # -------------------------------------------------------------------------------------
