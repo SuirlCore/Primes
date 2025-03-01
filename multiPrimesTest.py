@@ -61,7 +61,7 @@ def adjust_sleep_time(target_cpu=40, decrease_step=0.00005, increase_step=0.0000
     else:
         adjust_sleep_time.sleep_time = min(max_sleep, adjust_sleep_time.sleep_time + increase_step)
 
-    print(adjust_sleep_time.sleep_time)
+    print(format(adjust_sleep_time.sleep_time, ".10f"))
     return adjust_sleep_time.sleep_time
 
 
