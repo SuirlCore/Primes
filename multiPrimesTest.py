@@ -7,6 +7,12 @@ import psutil
 #set the database variables
 databaseHost = ["127.0.0.1", "suirl", "letmeinnow", "primes"]
 
+#grab info from the user
+print("whats the IP for the database:")
+databaseHost[0] = input(">")
+print("What time delay would you like to use? (0.05 works for RPI 3b+)")
+timeDelay = input(">")
+
 #grab the computers hostname
 userNameInput = socket.gethostname()
 
@@ -39,7 +45,7 @@ def calculating():
                 multiSavePrime(newTest)
 
             #slow things down a bit.
-            time.sleep(0.05)
+            time.sleep(timeDelay)
 
         #edit the database to show the range has been completed
         sqlInput = "UPDATE inProgress SET inProgress = '0' WHERE userID = '" + userNameInput + "';"
