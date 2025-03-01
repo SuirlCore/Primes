@@ -71,7 +71,6 @@ def hostName():
     
 #function to select items from database. takes in the SQL query as a variable. outputs the result
 def multiSelect(sqlInput):
-    print("Pulling information from the database\n")
 
     #connect to the database
     mydb = mysql.connector.connect (
@@ -89,7 +88,6 @@ def multiSelect(sqlInput):
 
 #function to update the database. Takes in the SQL update query as a variable.
 def multiUpdate(sqlInput):
-    print("Updating the database\n")
 
     #connect to the database
     mydb = mysql.connector.connect (
@@ -168,16 +166,11 @@ def multiLoadRange():
 
         if secondMaxInt == 1:
             isRangeUniqueInt = 0
-            print("First range is being tested")
         elif secondMaxInt != 1:
-            print("maxInt = " + str(maxInt))
-            print("secondMaxInt = " + str(secondMaxInt))
             if maxInt <= (secondMaxInt + 100):
                 isRangeUniqueInt = 1
-                print("test shows there are multiple ranges")
             elif maxInt > (secondMaxInt + 100):
                 isRangeUniqueInt = 0
-                print("test shows range is unique")
 
         if isRangeUniqueInt == 1: 
             print("adding the next range.")
@@ -205,7 +198,6 @@ def multiLoadRange():
 # - multiPrimes: multiPrimeID (PRI, int, auto increment), primeIndex(int), multiPrimeNum (int)
 # - usersLogged: userID (varchar), IPAddr (varchar), loggedIn (varchar), timeIn (time), timeLogged (time), primesFound (int)
 def multiSavePrime(newTest):
-    print("Saving prime to database\n")
     userName = hostName()
     #generate sql to insert new prime
     sqlInput = "INSERT INTO multiPrimes (userID, multiPrimeNum) VALUES ('"+ userName[0] + "', " + str(newTest) + ");"
