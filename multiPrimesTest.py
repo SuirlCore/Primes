@@ -54,12 +54,14 @@ def adjust_sleep_time(target_cpu=40, decrease_step=0.005, increase_step=0.01, mi
         adjust_sleep_time.sleep_time = 0.1  # Start with 0.1 seconds
 
     cpu_usage = psutil.cpu_percent(interval=0.1)
+    print(cpu_usage)
 
     if cpu_usage < target_cpu:
         adjust_sleep_time.sleep_time = max(min_sleep, adjust_sleep_time.sleep_time - decrease_step)
     else:
         adjust_sleep_time.sleep_time = min(max_sleep, adjust_sleep_time.sleep_time + increase_step)
 
+    print(adjust_sleep_time.sleep_time)
     return adjust_sleep_time.sleep_time
 
 
