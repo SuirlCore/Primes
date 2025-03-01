@@ -48,7 +48,7 @@ def calculating():
 
 
 #adjusts the sleep time dynamicaly to keep cpu load at 40%
-def adjust_sleep_time(target_cpu=40, decrease_step=0.00005, increase_step=0.00005, min_sleep=0.00005, max_sleep=1.0):
+def adjust_sleep_time(target_cpu=40, decrease_step=0.0000000005, increase_step=0.0000000005, min_sleep=0.0000000005, max_sleep=1.0):
 
     if not hasattr(adjust_sleep_time, "sleep_time"):
         adjust_sleep_time.sleep_time = 0.001  # Start with 0.1 seconds
