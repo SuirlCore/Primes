@@ -39,7 +39,7 @@ def calculating():
                 multiSavePrime(newTest)
 
             #slow things down a bit.
-            time.sleep(0.005)
+            time.sleep(0.01)
 
         #edit the database to show the range has been completed
         sqlInput = "UPDATE inProgress SET inProgress = '0' WHERE userID = '" + userNameInput + "';"
