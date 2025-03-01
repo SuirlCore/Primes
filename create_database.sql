@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS inProgress (
   	userID varchar(60) NOT NULL,
 	numStartChecking int NOT NULL,
 	numEndChecking int NOT NULL,
-	inProgress int DEFAULT = '1',
+	inProgress int DEFAULT 1,
     PRIMARY KEY (instanceID)
 );
 
