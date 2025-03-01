@@ -51,7 +51,7 @@ def calculating():
 def adjust_sleep_time(target_cpu=40, decrease_step=0.0000000005, increase_step=0.0000000005, min_sleep=0.0000000005, max_sleep=1.0):
 
     if not hasattr(adjust_sleep_time, "sleep_time"):
-        adjust_sleep_time.sleep_time = 0.001  # Start with 0.1 seconds
+        adjust_sleep_time.sleep_time = 0.0000001  # Start with 0.1 seconds
 
     cpu_usage = psutil.cpu_percent(interval=0.1)
     print(cpu_usage)
