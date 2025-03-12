@@ -5,7 +5,7 @@ from datetime import datetime       #used to find current time for tracking how 
 import psutil
 
 #set the database variables
-databaseHost = ["127.0.0.1", "suirl", "letmeinnow", "primes"]
+databaseHost = ["192.168.1.73", "suirl", "letmeinnow", "primes"]
 
 #grab info from the user
 print("whats the IP for the database:")
@@ -45,7 +45,7 @@ def calculating():
                 multiSavePrime(newTest)
 
             #slow things down a bit.
-            time.sleep(timeDelay)
+            time.sleep(float(timeDelay))
 
         #edit the database to show the range has been completed
         sqlInput = "UPDATE inProgress SET inProgress = '0' WHERE userID = '" + userNameInput + "';"
