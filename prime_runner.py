@@ -1,326 +1,283 @@
-# Fully playable console prototype: prime-driven infinite runner (turn-based)
-# Controls:
-#  - 'j' + Enter : jump
-#  - '' (Enter)  : do nothing / advance frame
-#  - 'q' + Enter : quit
-#
-# This is a simple, turn-based console prototype meant to run in this notebook or locally.
-# It uses primes to generate chunks on the fly. Each new prime generates a chunk appended to the world.
-# The viewport scrolls from left to right; the player is always at a fixed x within the viewport.
-#
-# To stop the game, press 'q' and Enter.
-#
-# Note: This is a console (text) prototype. For a smoother real-time game, port to Pygame/Unity/Godot.
-import math, sys, time, random
+import mysql.connector
+import socket			    #used to find IP address and hostname for userID in multi user mode
+import time			    #used for testing, slows program down by 1 second per number
+from datetime import datetime       #used to find current time for tracking how long a user has been calculating
+import threading                    #used to create multiple threads for event based programming.
+import keyboard                     #detects if a key is pressed
 
-# ---------- Prime generator (incremental using trial division with primes list) ----------
-_primes = [2]
-def next_prime():
-    """Return the next prime after the current largest in _primes and append it."""
-    candidate = _primes[-1] + 1
+#database connection information. hostname, username, password, database name.
+#gather login information for the database
+print("Enter location of the database to be used:")
+print("1 - Localhost from BadPenny")
+print("2 - Odin @ 192.168.1.39 (On HufflepuffCommonroom wifi)")
+print("3 - Odin @ ? (On Speed-Racer wifi)")
+print("4 - Bad Penny 192.168.1.74 (On HufflepuffCommonroom wifi)")
+print("5 - Other location")
+databaseLocation = input()
+if databaseLocation == "1":
+    databaseHost = ["127.0.0.1", "root", "letmeinnow", "primes"]
+elif databaseLocation == "2":
+    databaseHost = ["192.168.1.39", "suirl", "letmeinnow", "primes"]
+elif databaseLocation == "3":
+    databaseHost = ["?", "suirl", "letmeinnow", "primes"]
+elif databaseLocation == "4":
+    databaseHost = ["192.168.1.74", "root", "letmeinnow", "primes"]
+elif databaseLocation == "5":
+    print("Please enter the IP address for the database")
+    databaseIPAddress = input()
+    print("What is the username for the database?")
+    databaseUsername = input()
+    print("What is the password for the database?")
+    databasePassword = input()
+    databaseHost = [databaseIPAddress, databaseUsername, databasePassword, "primes"]
+
+#grab the computers username from the user
+print("What name would you like this instance to use?")
+userNameInput = input()
+
+# -----------------------------
+# functions for multi threading
+# -----------------------------
+
+
+#calculate some primes
+def calculating():
+    print("Start Calculating\n")
+
     while True:
-        is_p = True
-        limit = int(math.sqrt(candidate)) + 1
-        for pr in _primes:
-            if pr > limit:
-                break
-            if candidate % pr == 0:
-                is_p = False
-                break
-        if is_p:
-            _primes.append(candidate)
-            return candidate
-        candidate += 1
-
-# ---------- prime_event from earlier, slightly adjusted to accept prev_prime for twin detection ----------
-def prime_event(p, prev_prime=None):
-    events = {}
-    events["height_offset"] = (p % 7) - 3
-    events["spacing"] = (p % 10) + 4        # shorter spacing for playability in console
-    events["chunk_length"] = (p % 30) + 20  # width of chunk
-    obstacles = []
-    if p % 3 == 0:
-        obstacles.append("cactus")
-    if p % 5 == 0:
-        obstacles.append("pit")
-    if p % 7 == 0:
-        obstacles.append("flying_enemy")
-    if p % 11 == 0:
-        obstacles.append("tall_obstacle")
-    if not obstacles:
-        obstacles.append("small_bump")
-    events["obstacles"] = obstacles
-    powerups = []
-    if p % 13 == 0:
-        powerups.append("double_jump")
-    if p % 17 == 0:
-        powerups.append("shield")
-    if p % 19 == 0:
-        powerups.append("slow_time")
-    events["powerups"] = powerups
-    events["theme_change"] = None
-    if p % 41 == 0:
-        events["theme_change"] = "night"
-    elif p % 43 == 0:
-        events["theme_change"] = "rain"
-    elif p % 47 == 0:
-        events["theme_change"] = "sandstorm"
-    events["special"] = None
-    # twin prime detection
-    if prev_prime is not None and abs(p - prev_prime) == 2:
-        events["special"] = "twin_boost"
-    # mersenne-ish check (simple)
-    if (p + 1) & p == 0:
-        events["special"] = "mersenne_bonus"
-    return events
-
-# ---------- chunk generator (returns a list of strings rows) ----------
-def generate_chunk(params, base_ground=8, width_override=None):
-    width = width_override or params["chunk_length"]
-    height = base_ground + 6
-    grid = [[" " for _ in range(width)] for _ in range(height)]
-    ground_y = base_ground + params["height_offset"]
-    ground_y = max(3, min(height - 2, ground_y))
-    for x in range(width):
-        grid[ground_y][x] = "_"
-        for y in range(ground_y + 1, height):
-            grid[y][x] = "█"
-    spacing = params["spacing"]
-    obstacles = params["obstacles"]
-    x = spacing % max(3, width - 2)
-    if x < 2:
-        x = 2
-    for obst in obstacles:
-        if x >= width - 1:
+        #get the next range
+        newTestRange = multiLoadRange()
+        newTest = newTestRange
+        
+        #actual calculating
+        while newTest <= (newTestRange + 100):
+            newTest = newTest + 1
+            x = 0
+            divisors = 0
+            while (x < (newTest / 2)) and (divisors <= 1):
+                x = x + 1
+                if newTest % x == 0:
+                    divisors = divisors + 1
+            if divisors <= 1:
+                multiSavePrime(newTest)
+            
+        #ends this task if the userInput task is not still running
+        if inputTask.is_alive() == False:
             break
-        if obst == "cactus":
-            grid[ground_y - 1][x] = "♣"
-        elif obst == "pit":
-            for dx in range(2):
-                if x + dx < width:
-                    grid[ground_y][x + dx] = " "
-                    for y in range(ground_y + 1, height):
-                        grid[y][x + dx] = " "
-        elif obst == "tall_obstacle":
-            grid[ground_y - 1][x] = "│"
-            if ground_y - 2 >= 0:
-                grid[ground_y - 2][x] = "│"
-        elif obst == "flying_enemy":
-            fly_y = max(1, ground_y - 3)
-            grid[fly_y][x] = "✈"
-        elif obst == "small_bump":
-            grid[ground_y - 1][x] = "▲"
-        x += spacing
-    # powerups
-    for i, pwr in enumerate(params["powerups"]):
-        px = min(width - 3, 3 + i*4)
-        py = ground_y - 2
-        if pwr == "double_jump":
-            grid[py][px] = "⬡"
-        elif pwr == "shield":
-            grid[py][px] = "◎"
-        elif pwr == "slow_time":
-            grid[py][px] = "⧗"
-    # theme indicator
-    if params["theme_change"]:
-        tag = {"night":"N","rain":"R","sandstorm":"S"}[params["theme_change"]]
-        grid[0][0] = tag
-    return ["".join(row) for row in grid]
 
-# ---------- Helper to stitch chunks into an infinite world list of columns ----------
-def append_chunk_to_world(world_cols, chunk_rows):
-    # world_cols: list of columns (each column is string of height), chunk_rows: list of rows (strings)
-    height = len(chunk_rows)
-    width = len(chunk_rows[0])
-    for x in range(width):
-        col = "".join(chunk_rows[y][x] for y in range(height))
-        world_cols.append(col)
-
-# ---------- Simple renderer for a viewport ----------
-def render_viewport(world_cols, camera_x, view_w=40, view_h=14, player_x_rel=8, player_y=None, score=0):
-    # camera_x: index in world_cols where viewport starts
-    view_w = min(view_w, max(10, len(world_cols) - camera_x))
-    view_cols = world_cols[camera_x:camera_x+view_w]
-    # Each col is a string of height
-    height = len(view_cols[0])
-    rows = [[" " for _ in range(view_w)] for _ in range(height)]
-    for cx, col in enumerate(view_cols):
-        for y, ch in enumerate(col):
-            rows[y][cx] = ch
-    # place player
-    if player_y is not None:
-        px = player_x_rel
-        if 0 <= px < view_w and 0 <= player_y < height:
-            rows[player_y][px] = "P"
-    # join
-    lines = ["".join(row) for row in rows]
-    header = f"Score: {score}  Primes found: {len(_primes)}  Next prime preview hidden.  Controls: j=jump, q=quit, Enter=wait"
-    sep = "-" * min(120, view_w)
-    return "\n".join([header, sep] + lines + [sep])
-
-# ---------- Collision detection ----------
-def is_solid_at(world_cols, x_global, y):
-    if x_global >= len(world_cols) or x_global < 0:
-        return False
-    col = world_cols[x_global]
-    if y < 0 or y >= len(col):
-        return False
-    ch = col[y]
-    return ch not in (" ",)
-
-# ---------- Build initial world with a few primes ----------
-world_cols = []
-for i in range(3):  # seed with a few primes/chunks
-    p = next_prime()
-    params = prime_event(p, _primes[-2] if len(_primes)>=2 else None)
-    chunk = generate_chunk(params)
-    append_chunk_to_world(world_cols, chunk)
-
-# ---------- Game state ----------
-camera_x = 0
-viewport_w = 40
-viewport_h = len(world_cols[0])
-player_x_rel = 8  # player's column in viewport
-player_global_x = player_x_rel  # will increase as camera moves
-base_ground_guess = 10
-player_y = 0
-vy = 0.0
-gravity = 1.0
-on_ground = False
-jump_strength = -4.0
-score = 0
-double_jump_available = False
-shield = False
-slow_time_turns = 0
-game_over = False
-ticks = 0
-
-# Initialize player on top of ground at starting column
-# find first ground column under player_global_x
-def find_ground_y(world_cols, x):
-    col = world_cols[x] if x < len(world_cols) else None
-    if not col:
-        return base_ground_guess
-    # ground is first underscore from top
-    for y, ch in enumerate(col):
-        if ch == "_":
-            return y
-    return base_ground_guess
-
-player_y = find_ground_y(world_cols, player_global_x) - 1
-on_ground = True
-
-# ---------- Main loop (turn-based) ----------
-print("Prime Runner - console prototype. Press Enter each frame. 'j' + Enter to jump. 'q' + Enter to quit.")
-while not game_over:
-    # Ensure enough world ahead; generate primes/chunks as needed
-    while len(world_cols) < camera_x + viewport_w + 40:
-        prev_p = _primes[-1] if _primes else None
-        p = next_prime()
-        params = prime_event(p, prev_p)
-        chunk = generate_chunk(params)
-        append_chunk_to_world(world_cols, chunk)
-
-    # render
-    out = render_viewport(world_cols, camera_x, view_w=viewport_w, view_h=viewport_h, player_x_rel=player_x_rel, player_y=player_y, score=score)
-    print("\033[H\033[J", end="")  # clear screen
-    print(out)
-
-    # get input
-    cmd = input("Command (j=jump, q=quit, Enter=wait): ").strip().lower()
-    if cmd == "q":
-        print("Quitting...")
-        break
-    do_jump = (cmd == "j")
-
-    # handle jump (simple)
-    if do_jump:
-        if on_ground:
-            vy = jump_strength
-            on_ground = False
-            double_jump_available = True
-        elif double_jump_available:
-            vy = jump_strength
-            double_jump_available = False
-
-    # physics update (discrete)
-    vy += gravity
-    new_y = int(player_y + vy)
-    # prevent falling below bottom
-    max_y = viewport_h - 1
-    if new_y > max_y:
-        new_y = max_y
-        vy = 0
-    # collision with ground: find ground y at player's global x
-    global_x = camera_x + player_x_rel
-    ground_y = None
-    # look for underscore in column
-    col = world_cols[global_x]
-    for y, ch in enumerate(col):
-        if ch == "_":
-            ground_y = y
+#look for the q key to be pressed, and end the task
+def userInput():
+    while True:
+        if keyboard.is_pressed('q'):
             break
-    if ground_y is None:
-        ground_y = viewport_h - 2
-    # if falling onto ground
-    if new_y >= ground_y - 1:
-        player_y = ground_y - 1
-        vy = 0
-        on_ground = True
-    else:
-        player_y = new_y
-        on_ground = False
 
-    # collision with obstacles at player's position
-    # check the cell at player's location in the world
-    cell_ch = world_cols[global_x][player_y]
-    if cell_ch in ("♣","│","▲"):  # hitting obstacle
-        if shield:
-            shield = False
-            print("Shield used to block obstacle!")
-        else:
-            print("\nYou hit an obstacle! Game Over.")
-            game_over = True
-            break
-    elif cell_ch == " ":
-        # in the air or falling into a pit: check below
-        below_y = player_y + 1
-        if below_y >= len(world_cols[global_x]) or world_cols[global_x][below_y] == " ":
-            # falling into pit
-            print("\nYou fell into a pit! Game Over.")
-            game_over = True
-            break
-    elif cell_ch == "✈":
-        # collision with flying enemy if at same y
-        if shield:
-            shield = False
-        else:
-            print("\nHit by flying enemy! Game Over.")
-            game_over = True
-            break
-    elif cell_ch in ("⬡","◎","⧗"):
-        # pick up power-up
-        if cell_ch == "⬡":
-            double_jump_available = True
-            print("Picked up double-jump!")
-        elif cell_ch == "◎":
-            shield = True
-            print("Picked up shield!")
-        elif cell_ch == "⧗":
-            slow_time_turns = 3
-            print("Picked up slow-time!")
-        # remove powerup from world by replacing that char with space in column
-        col_list = list(world_cols[global_x])
-        col_list[player_y] = " "
-        world_cols[global_x] = "".join(col_list)
 
-    # advance camera (movement)
-    advance = 1
-    if slow_time_turns > 0:
-        advance = 0  # slow time freezes forward movement for a turn
-        slow_time_turns -= 1
-    camera_x += advance
-    score += 1
-    ticks += 1
+# -------------------------------------------------------------------------------------
+# Functions for multi user loading, holding spot, and saving primes to MariaDB database
+# -------------------------------------------------------------------------------------
 
-print(f"Final score: {score}, Primes generated: {len(_primes)}")
+
+#function to find current users IP and localhost name. returns userName[] index 0 = name, index 1 = IP
+def hostName():
+    #This code grabs the computers information that the user provided at the beginning of the program
+    userName = []
+    userName.append(userNameInput)
+
+    #This code will grab the computers host name and ip address to use
+    #print("Looking for computers host name\n")
+    #hname=socket.gethostname()
+    #userName = []
+    #userName.append(socket.gethostname())
+    #userName.append(socket.gethostbyname(hname))
+    
+    return userName
+    
+#function to select items from database. takes in the SQL query as a variable. outputs the result
+def multiSelect(sqlInput):
+
+    #connect to the database
+    mydb = mysql.connector.connect (
+	host = databaseHost[0],
+	user = databaseHost[1],
+	password = databaseHost[2],
+	database = databaseHost[3]
+    )
+    mycursor = mydb.cursor()
+
+    #SQL statement to run the SQL statement
+    mycursor.execute(sqlInput)
+    myresult = mycursor.fetchall()
+    return myresult
+
+#function to update the database. Takes in the SQL update query as a variable.
+def multiUpdate(sqlInput):
+
+    #connect to the database
+    mydb = mysql.connector.connect (
+    	host = databaseHost[0],
+    	user = databaseHost[1],
+    	password = databaseHost[2],
+    	database = databaseHost[3]
+    )
+    mycursor = mydb.cursor()
+
+    #insert the SQL statement into the database
+    mycursor.execute(sqlInput)
+    mydb.commit()
+
+#function to load the last range that was checked
+# - multiPrimes: multiPrimeID (PRI, int, auto increment), primeIndex(int), multiPrimeNum (int)
+# - inProgress: instanceID (PRI, int, auto increment), userID (varchar), numStartChecking (int), numEndChecking (int)
+def multiLoadRange():
+    #if there is a range in inProgress table, grab that and add 1 and 100
+    sqlInput = "SELECT MAX(numEndChecking) as numStart FROM inProgress;"
+    lastRange = multiSelect(sqlInput)
+    for x in lastRange:		#lastRange is a list of tuples. iterates through to grab an int.
+        for y in x:
+            lastRangeInt = y
+
+    #if no range in inProgress, grab last prime found and add 1 and 100
+    if lastRangeInt == None:
+        sqlInput = "SELECT MAX(multiPrimeNum) as lastPrime FROM multiPrimes;"
+        lastRange = multiSelect(sqlInput)
+        for x in lastRange:		#lastPrime is a list of tuples. iterates through to grab an int.
+            for y in x:
+                lastRangeInt = y
+
+    #add new range to be checked to inProgress table
+    if lastRangeInt == None:
+        lastRangeInt = 0
+    currentRangeStart = lastRangeInt + 1
+    currentRangeEnd = currentRangeStart + 100
+    userName = hostName()
+    sqlInput = "INSERT INTO inProgress (userID, numStartChecking, numEndChecking) VALUES ('" + str(userName[0]) + "', " + str(currentRangeStart) + ", " + str(currentRangeEnd) + ");"
+    multiUpdate(sqlInput)
+
+    #there can be cases where multiple program instances grab the same range to be checked at the same time. We need to ensure this does not happen.
+    #double check that no other instance has the same range as the one just grabbed.
+    testCase = 1
+    while testCase == 1:
+        #grab the last two ranges being checked
+        sqlInput = "SELECT MAX(numStartChecking) as secondMax FROM inProgress WHERE numStartChecking NOT IN (SELECT Max(numStartChecking) FROM inProgress);"
+        secondMaxRange = multiSelect(sqlInput)
+        for x in secondMaxRange:		#isRangeUnique is a list of tuples. iterates through to grab an int.
+            for y in x:
+                secondMaxInt = y
+        sqlInput = "SELECT Max(numStartChecking) as max FROM inProgress;"
+        maxRange = multiSelect(sqlInput)
+        for x in maxRange:		#isRangeUnique is a list of tuples. iterates through to grab an int.
+            for y in x:
+                maxInt = y
+
+        if secondMaxInt == 1:
+            #when database is first created, there is no second range to test against, so we skip this test entirely.
+            isRangeUniqueInt = 0
+        elif secondMaxInt != 1:
+            #check if the max and secondMax overlap
+            if maxInt <= (secondMaxInt + 100):
+                isRangeUniqueInt = 1    #ranges overlap, need a new range
+            elif maxInt > (secondMaxInt + 100):
+                isRangeUniqueInt = 0    #ranges do not overlap. all good.
+
+        #if there are multiple instances of the last range being checked then do this
+        if isRangeUniqueInt == 1: 
+            sqlInput = "SELECT MAX(multiPrimeNum) as lastPrime FROM multiPrimes;"
+            lastRange = multiSelect(sqlInput)
+            for x in lastRange:		#lastPrime is a list of tuples. iterates through to grab an int.
+                for y in x:
+                    lastRangeInt = y
+
+            #add new range to be checked to inProgress table
+            if lastRangeInt == None:
+                lastRangeInt = 0
+            currentRangeStart = lastRangeInt + 1
+            currentRangeEnd = currentRangeStart + 100
+            userName = hostName()
+            sqlInput = "INSERT INTO inProgress (userID, numStartChecking, numEndChecking) VALUES ('" + str(userName[0]) + "', " + str(currentRangeStart) + ", " + str(currentRangeEnd) + ");"
+            multiUpdate(sqlInput)
+
+        #if there is only one unique case then break the loop and do nothing
+        elif isRangeUniqueInt == 0:
+            testCase = 0            
+
+    return currentRangeStart
+
+#function to save found prime to the database
+# - multiPrimes: multiPrimeID (PRI, int, auto increment), primeIndex(int), multiPrimeNum (int)
+# - usersLogged: userID (varchar), IPAddr (varchar), loggedIn (varchar), timeIn (time), timeLogged (time), primesFound (int)
+def multiSavePrime(newTest):
+    userName = hostName()
+    #generate sql to insert new prime
+    sqlInput = "INSERT INTO multiPrimes (userID, multiPrimeNum) VALUES ('"+ userName[0] + "', " + str(newTest) + ");"
+
+    #calculate whether this prime is a mersenne prime, and insert it into the database if it is
+    mersenneTest = 2^newTest-1
+    x = 0
+    divisors = 0
+    while (x < (mersenneTest / 2)) and (divisors <= 1):
+        x = x + 1
+        if newTest % x == 0:
+            divisors = divisors + 1
+    if divisors <= 1:
+        multiSavePrime(newTest)
+
+
+    multiUpdate(sqlInput)
+
+
+# -------------------------------------------------------------------------------------
+# Functions for generating side scroller game
+# -------------------------------------------------------------------------------------
+
+
+#function to generate a moving field based on the last prime entered
+def scroll_field_with_prime_gravity(field, prime, width):
+    """
+    field  : list[int]   # one int per row
+    prime  : int         # arbitrarily large
+    width  : int         # horizontal size
+    """
+
+    height = len(field)
+
+    # 1. Scroll field left
+    mask = (1 << width) - 1
+    field = [(row << 1) & mask for row in field]
+
+    # 2. Sample ONLY the lowest `height` bits of the prime
+    bits = [(prime >> i) & 1 for i in range(height)]
+
+    # 3. Flip vertically
+    bits.reverse()
+
+    # 4. Gravity: pack 1s at bottom
+    ones = sum(bits)
+    new_column = [0] * (height - ones) + [1] * ones
+
+    # 5. Insert column
+    for row_index in range(height):
+        field[row_index] |= new_column[row_index]
+
+    return field
+
+#function to input field, and display it on the screen
+
+# ------------------
+# main program start
+# ------------------
+
+#create task variables attached to functions
+calculatingTask = threading.Thread(target=calculating, name='calculatingTask')
+inputTask = threading.Thread(target=userInput, name='inputTask')
+
+#start a task for calculating, and a task to look for user input 'q' to quit the program
+print("Calculating task starting.\n")
+calculatingTask.start()
+print("Looking for user input task starting.\n")
+inputTask.start()
+
+#once both concurrent tasks end, we continue.
+calculatingTask.join()
+inputTask.join()
+
+print("all tasks complete.\n")

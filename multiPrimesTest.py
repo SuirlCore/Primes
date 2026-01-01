@@ -222,6 +222,20 @@ def multiSavePrime(newTest):
     userName = hostName()
     #generate sql to insert new prime
     sqlInput = "INSERT INTO multiPrimes (userID, multiPrimeNum) VALUES ('"+ userName[0] + "', " + str(newTest) + ");"
+
+    #calculate whether this prime is a mersenne prime, and insert it into the database if it is
+    mersenneTest = 2^newTest-1
+    x = 0
+    divisors = 0
+    while (x < (mersenneTest / 2)) and (divisors <= 1):
+        x = x + 1
+        if newTest % x == 0:
+            divisors = divisors + 1
+    if divisors <= 1:
+        print("New prime found: " + str(newTest))
+        multiSavePrime(newTest)
+
+
     multiUpdate(sqlInput)
     
 

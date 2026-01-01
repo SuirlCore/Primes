@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS multiPrimes (
     PRIMARY KEY (multiPrimeID)
 );
 
+CREATE TABLE IF NOT EXISTS mersennePrimes (
+	mersennePrimeID int NOT NULL AUTO_INCREMENT,
+	userID varchar(60),
+	primeIndex int,
+	mersennePrimeNum int NOT NULL,
+	PRIMARY KEY (mersennePrimeID)
+);
+
 CREATE TABLE IF NOT EXISTS inProgress (
 	instanceID int NOT NULL AUTO_INCREMENT,
   	userID varchar(60) NOT NULL,
