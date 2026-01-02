@@ -1,9 +1,11 @@
 import mysql.connector
-import socket			    #used to find IP address and hostname for userID in multi user mode
-import time			    #used for testing, slows program down by 1 second per number
+import socket			            #used to find IP address and hostname for userID in multi user mode
+import time			                #used for testing, slows program down by 1 second per number
 from datetime import datetime       #used to find current time for tracking how long a user has been calculating
 import threading                    #used to create multiple threads for event based programming.
 import keyboard                     #detects if a key is pressed
+import os
+import sys
 
 #database connection information. hostname, username, password, database name.
 #gather login information for the database
@@ -60,6 +62,9 @@ def calculating():
                     divisors = divisors + 1
             if divisors <= 1:
                 multiSavePrime(newTest)
+                field = generateField(field, newTest, 24)
+                renderField(field, 24, newTest, 8)
+
             
         #ends this task if the userInput task is not still running
         if inputTask.is_alive() == False:
@@ -231,14 +236,17 @@ def multiSavePrime(newTest):
 
 
 #function to generate a moving field based on the last prime entered
-def scroll_field_with_prime_gravity(field, prime, width):
+def generateField(field, prime, width, height):
     """
-    field  : list[int]   # one int per row
-    prime  : int         # arbitrarily large
-    width  : int         # horizontal size
+    field  : list[int] | None
+    prime  : int
+    width  : int
+    height : int
     """
 
-    height = len(field)
+    # Initialize empty field if this is the first run
+    if field is None:
+        field = [0] * height
 
     # 1. Scroll field left
     mask = (1 << width) - 1
@@ -261,6 +269,43 @@ def scroll_field_with_prime_gravity(field, prime, width):
     return field
 
 #function to input field, and display it on the screen
+def renderField(field, width, prime, height):
+    """
+    field  : list[int]
+    width  : int
+    prime  : int
+    height : int   # number of bits sampled from prime
+    """
+
+    # Clear screen
+    os.system("cls" if os.name == "nt" else "clear")
+
+    # Count 1s in the lowest `height` bits of the prime
+    ones = sum((prime >> i) & 1 for i in range(height))
+
+    # Choose color
+    if ones <= 3:
+        color = "\033[94m"   # blue (water)
+    else:
+        color = "\033[92m"   # green (land)
+
+    RESET = "\033[0m"
+    BLOCK = f"{color}█{RESET}"
+
+    # Render top to bottom
+    for row in field:
+        line = format(row, f"0{width}b")
+        rendered = ""
+        for bit in line:
+            if bit == "1":
+                rendered += BLOCK
+            else:
+                rendered += " "
+        print(rendered)
+
+    print("-" * width)
+    print(f"Last prime: {prime}  |  ones: {ones}")
+
 
 # ------------------
 # main program start
