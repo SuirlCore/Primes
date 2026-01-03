@@ -108,6 +108,13 @@ else:
     }
     save_settings(settings)
 
+databaseHost = [
+    settings["host"],
+    settings["user"],
+    settings["password"],
+    settings["database"],
+]
+
 
 # -----------------------------
 # functions for multi threading
@@ -115,14 +122,14 @@ else:
 
 
 #calculate some primes
-def calculating():
+def calculating(databaseHost):
     print("Start Calculating\n")
 
     field = None
 
     while True:
         #get the next range
-        newTestRange = multiLoadRange()
+        newTestRange = multiLoadRange(databaseHost)
         newTest = newTestRange
         
         #actual calculating
@@ -140,14 +147,14 @@ def calculating():
 
             if is_prime:
                 print("new prime found")
-                multiSavePrime(newTest)
+                multiSavePrime(newTest, databaseHost)
                 display_queue.put((newTest, time.perf_counter()))
 
                 #check if its a mesenne prime
                 p = newTest
 
                 if p > 0 and ((p + 1) & p) == 0:
-                    multiSaveMersenne(newTest)
+                    multiSaveMersenne(newTest, databaseHost)
                     pass           
             
         #ends this task if the userInput task is not still running
@@ -239,6 +246,7 @@ def userInput():
 def hostName():
     #This code grabs the computers information that the user provided at the beginning of the program
     userName = []
+    userNameInput = settings["instance_name"]
     userName.append(userNameInput)
 
     #This code will grab the computers host name and ip address to use
@@ -251,7 +259,7 @@ def hostName():
     return userName
     
 #function to select items from database. takes in the SQL query as a variable. outputs the result
-def multiSelect(sqlInput):
+def multiSelect(sqlInput, databaseHost):
 
     #connect to the database
     mydb = mysql.connector.connect (
@@ -268,7 +276,7 @@ def multiSelect(sqlInput):
     return myresult
 
 #function to update the database. Takes in the SQL update query as a variable.
-def multiUpdate(sqlInput):
+def multiUpdate(sqlInput, databaseHost):
 
     #connect to the database
     mydb = mysql.connector.connect (
@@ -286,10 +294,10 @@ def multiUpdate(sqlInput):
 #function to load the last range that was checked
 # - multiPrimes: multiPrimeID (PRI, int, auto increment), primeIndex(int), multiPrimeNum (int)
 # - inProgress: instanceID (PRI, int, auto increment), userID (varchar), numStartChecking (int), numEndChecking (int)
-def multiLoadRange():
+def multiLoadRange(databaseHost):
     #if there is a range in inProgress table, grab that and add 1 and 100
     sqlInput = "SELECT MAX(numEndChecking) as numStart FROM inProgress;"
-    lastRange = multiSelect(sqlInput)
+    lastRange = multiSelect(sqlInput, databaseHost)
     for x in lastRange:		#lastRange is a list of tuples. iterates through to grab an int.
         for y in x:
             lastRangeInt = y
@@ -297,7 +305,7 @@ def multiLoadRange():
     #if no range in inProgress, grab last prime found and add 1 and 100
     if lastRangeInt == None:
         sqlInput = "SELECT MAX(multiPrimeNum) as lastPrime FROM multiPrimes;"
-        lastRange = multiSelect(sqlInput)
+        lastRange = multiSelect(sqlInput, databaseHost)
         for x in lastRange:		#lastPrime is a list of tuples. iterates through to grab an int.
             for y in x:
                 lastRangeInt = y
@@ -309,7 +317,7 @@ def multiLoadRange():
     currentRangeEnd = currentRangeStart + 100
     userName = hostName()
     sqlInput = "INSERT INTO inProgress (userID, numStartChecking, numEndChecking) VALUES ('" + str(userName[0]) + "', " + str(currentRangeStart) + ", " + str(currentRangeEnd) + ");"
-    multiUpdate(sqlInput)
+    multiUpdate(sqlInput, databaseHost)
 
     #there can be cases where multiple program instances grab the same range to be checked at the same time. We need to ensure this does not happen.
     #double check that no other instance has the same range as the one just grabbed.
@@ -317,12 +325,12 @@ def multiLoadRange():
     while testCase == 1:
         #grab the last two ranges being checked
         sqlInput = "SELECT MAX(numStartChecking) as secondMax FROM inProgress WHERE numStartChecking NOT IN (SELECT Max(numStartChecking) FROM inProgress);"
-        secondMaxRange = multiSelect(sqlInput)
+        secondMaxRange = multiSelect(sqlInput, databaseHost)
         for x in secondMaxRange:		#isRangeUnique is a list of tuples. iterates through to grab an int.
             for y in x:
                 secondMaxInt = y
         sqlInput = "SELECT Max(numStartChecking) as max FROM inProgress;"
-        maxRange = multiSelect(sqlInput)
+        maxRange = multiSelect(sqlInput, databaseHost)
         for x in maxRange:		#isRangeUnique is a list of tuples. iterates through to grab an int.
             for y in x:
                 maxInt = y
@@ -340,7 +348,7 @@ def multiLoadRange():
         #if there are multiple instances of the last range being checked then do this
         if isRangeUniqueInt == 1: 
             sqlInput = "SELECT MAX(multiPrimeNum) as lastPrime FROM multiPrimes;"
-            lastRange = multiSelect(sqlInput)
+            lastRange = multiSelect(sqlInput, databaseHost)
             for x in lastRange:		#lastPrime is a list of tuples. iterates through to grab an int.
                 for y in x:
                     lastRangeInt = y
@@ -352,7 +360,7 @@ def multiLoadRange():
             currentRangeEnd = currentRangeStart + 100
             userName = hostName()
             sqlInput = "INSERT INTO inProgress (userID, numStartChecking, numEndChecking) VALUES ('" + str(userName[0]) + "', " + str(currentRangeStart) + ", " + str(currentRangeEnd) + ");"
-            multiUpdate(sqlInput)
+            multiUpdate(sqlInput, databaseHost)
 
         #if there is only one unique case then break the loop and do nothing
         elif isRangeUniqueInt == 0:
@@ -363,21 +371,21 @@ def multiLoadRange():
 #function to save found prime to the database
 # - multiPrimes: multiPrimeID (PRI, int, auto increment), primeIndex(int), multiPrimeNum (int)
 # - usersLogged: userID (varchar), IPAddr (varchar), loggedIn (varchar), timeIn (time), timeLogged (time), primesFound (int)
-def multiSavePrime(newTest):
+def multiSavePrime(newTest, databaseHost):
     userName = hostName()
     #generate sql to insert new prime
     sqlInput = "INSERT INTO multiPrimes (userID, multiPrimeNum) VALUES ('"+ userName[0] + "', " + str(newTest) + ");"
-    multiUpdate(sqlInput)
+    multiUpdate(sqlInput, databaseHost)
 
 #function to save found mersenne prime into the database
 # - multiPrimes: multiPrimeID (PRI, int, auto increment), primeIndex(int), multiPrimeNum (int)
 # - mersennePrimes: mersennePrimeID (PRI, int, auto increment), userID (varchar), primeIndex (int), mersennePrimeNum (int)
 # - usersLogged: userID (varchar), IPAddr (varchar), loggedIn (varchar), timeIn (time), timeLogged (time), primesFound (int)
-def multiSaveMersenne(newTest):
+def multiSaveMersenne(newTest, databaseHost):
     userName = hostName()
     #generate sql to insert new prime
     sqlInput = "INSERT INTO mersennePrimes (userID, mersennePrimeNum) VALUES ('"+ userName[0] + "', " + str(newTest) + ");"
-    multiUpdate(sqlInput)
+    multiUpdate(sqlInput, databaseHost)
 
 
 # -------------------------------------------------------------------------------------
@@ -458,7 +466,7 @@ def renderField(field, width, prime):
 # ------------------
 
 #create task variables attached to functions
-calculatingTask = threading.Thread(target=calculating, name='calculatingTask')
+calculatingTask = threading.Thread(target=calculating, args=(databaseHost,), name='calculatingTask')
 inputTask = threading.Thread(target=userInput, name='inputTask')
 #visualizationTask = threading.Thread(target=visualizationLoop, name='screeTask')
 
