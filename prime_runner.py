@@ -6,36 +6,108 @@ import threading                    #used to create multiple threads for event b
 import keyboard                     #detects if a key is pressed
 import os
 import sys
+import queue
+import time
+from collections import deque
 
-#database connection information. hostname, username, password, database name.
-#gather login information for the database
-print("Enter location of the database to be used:")
-print("1 - Localhost from BadPenny")
-print("2 - Odin @ 192.168.1.39 (On HufflepuffCommonroom wifi)")
-print("3 - Odin @ ? (On Speed-Racer wifi)")
-print("4 - Bad Penny 192.168.1.74 (On HufflepuffCommonroom wifi)")
-print("5 - Other location")
-databaseLocation = input()
-if databaseLocation == "1":
-    databaseHost = ["127.0.0.1", "root", "letmeinnow", "primes"]
-elif databaseLocation == "2":
-    databaseHost = ["192.168.1.39", "suirl", "letmeinnow", "primes"]
-elif databaseLocation == "3":
-    databaseHost = ["?", "suirl", "letmeinnow", "primes"]
-elif databaseLocation == "4":
-    databaseHost = ["192.168.1.74", "root", "letmeinnow", "primes"]
-elif databaseLocation == "5":
-    print("Please enter the IP address for the database")
-    databaseIPAddress = input()
-    print("What is the username for the database?")
-    databaseUsername = input()
-    print("What is the password for the database?")
-    databasePassword = input()
-    databaseHost = [databaseIPAddress, databaseUsername, databasePassword, "primes"]
 
-#grab the computers username from the user
-print("What name would you like this instance to use?")
-userNameInput = input()
+display_queue = queue.Queue()
+stop_event = threading.Event()
+
+# --------------------------------
+# functions for loading settings
+# --------------------------------
+
+SETTINGS_FILE = "primeSettings.txt"
+REQUIRED_KEYS = {"host", "user", "password", "database", "instance_name"}
+
+#function for loading settings from primeSettings.txt
+def load_settings():
+    if not os.path.exists(SETTINGS_FILE):
+        return None
+
+    settings = {}
+    try:
+        with open(SETTINGS_FILE, "r") as f:
+            for line in f:
+                if "=" in line:
+                    key, value = line.strip().split("=", 1)
+                    settings[key] = value
+    except Exception:
+        return None
+
+    if not REQUIRED_KEYS.issubset(settings.keys()):
+        return None
+
+    return settings
+
+#function to save settings to primeSettings.txt
+def save_settings(settings):
+    with open(SETTINGS_FILE, "w") as f:
+        for key, value in settings.items():
+            f.write(f"{key}={value}\n")
+
+#function to change settings
+def prompt_database_settings():
+    print("Enter location of the database to be used:")
+    print("1 - Localhost from BadPenny")
+    print("2 - Odin @ 192.168.1.39 (On HufflepuffCommonroom wifi)")
+    print("3 - Odin @ ? (On Speed-Racer wifi)")
+    print("4 - Bad Penny 192.168.1.74 (On HufflepuffCommonroom wifi)")
+    print("5 - Other location")
+
+    choice = input("> ")
+
+    if choice == "1":
+        return {"host": "127.0.0.1", "user": "root", "password": "letmeinnow", "database": "primes"}
+    elif choice == "2":
+        return {"host": "192.168.1.39", "user": "suirl", "password": "letmeinnow", "database": "primes"}
+    elif choice == "3":
+        return {"host": "?", "user": "suirl", "password": "letmeinnow", "database": "primes"}
+    elif choice == "4":
+        return {"host": "192.168.1.74", "user": "root", "password": "letmeinnow", "database": "primes"}
+    elif choice == "5":
+        host = input("Database IP address: ")
+        user = input("Database username: ")
+        password = input("Database password: ")
+        return {"host": host, "user": user, "password": password, "database": "primes"}
+    else:
+        print("Invalid choice.")
+        return prompt_database_settings()
+
+settings = load_settings()
+
+if settings:
+    print("Existing settings found:")
+    print(f"Database: {settings['host']} ({settings['database']})")
+    print(f"Instance name: {settings['instance_name']}")
+    print()
+    print("1 - Run with these settings")
+    print("2 - Change settings")
+
+    choice = input("> ")
+
+    if choice == "2":
+        db_settings = prompt_database_settings()
+        instance_name = input("What name would you like this instance to use? ")
+
+        settings = {
+            **db_settings,
+            "instance_name": instance_name
+        }
+        save_settings(settings)
+
+else:
+    print("No valid settings found. Initial setup required.")
+    db_settings = prompt_database_settings()
+    instance_name = input("What name would you like this instance to use? ")
+
+    settings = {
+        **db_settings,
+        "instance_name": instance_name
+    }
+    save_settings(settings)
+
 
 # -----------------------------
 # functions for multi threading
@@ -64,10 +136,85 @@ def calculating():
                     divisors = divisors + 1
             if divisors <= 1:
                 multiSavePrime(newTest)
-                field = generateField(field, newTest, 100, 8)
-                renderField(field, 100, newTest)
+
+                p = newTest  # your prime
+
+                if p > 0 and ((p + 1) & p) == 0:
+                    multiSaveMersenne(newTest)
+                    pass
+
+                display_queue.put((newTest, time.perf_counter()))
 
             
+        #ends this task if the userInput task is not still running
+        if inputTask.is_alive() == False:
+            break
+
+#function for updating the screen and playing the runner
+def visualizationLoop(width=100, height=8, fps=30, buffer_size=200):
+    field = None
+
+    prime_buffer = deque(maxlen=buffer_size)
+    prime_times = deque(maxlen=20)      # for rolling average
+    intervals = deque(maxlen=20)
+
+    last_rendered_prime = None
+    scroll_accumulator = 0.0
+
+    FRAME_TIME = 1.0 / fps
+
+    while True:
+
+        frame_start = time.perf_counter()
+
+        # Drain incoming messages
+        try:
+            while True:
+                prime, timestamp = display_queue.get_nowait()
+                prime_buffer.append(prime)
+
+                if prime_times:
+                    intervals.append(timestamp - prime_times[-1])
+                prime_times.append(timestamp)
+        except queue.Empty:
+            pass
+
+        # Determine scroll speed
+        if intervals:
+            avg_interval = sum(intervals) / len(intervals)
+            columns_per_second = max(1.0, min(10.0, 1.0 / avg_interval))
+        else:
+            columns_per_second = 1.0
+
+        scroll_accumulator += columns_per_second * FRAME_TIME
+
+        # Advance field
+        while scroll_accumulator >= 1.0:
+            scroll_accumulator -= 1.0
+
+            if prime_buffer:
+                prime = prime_buffer.popleft()
+                last_rendered_prime = prime
+                field = generateField(field, prime, width, height)
+            else:
+                # No new prime — coast terrain
+                field = generateField(field, 0, width, height)
+
+        # Render
+        if field is not None:
+            renderField(
+                field,
+                width,
+                last_rendered_prime if last_rendered_prime else 0,
+                height
+            )
+
+        # Frame timing
+        elapsed = time.perf_counter() - frame_start
+        sleep_time = FRAME_TIME - elapsed
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+
         #ends this task if the userInput task is not still running
         if inputTask.is_alive() == False:
             break
@@ -78,6 +225,7 @@ def userInput():
     while True:
         if keyboard.is_pressed('q'):
             break
+
 
 # -------------------------------------------------------------------------------------
 # Functions for multi user loading, holding spot, and saving primes to MariaDB database
@@ -217,7 +365,17 @@ def multiSavePrime(newTest):
     #generate sql to insert new prime
     sqlInput = "INSERT INTO multiPrimes (userID, multiPrimeNum) VALUES ('"+ userName[0] + "', " + str(newTest) + ");"
     multiUpdate(sqlInput)
-    
+
+#function to save found mersenne prime into the database
+# - multiPrimes: multiPrimeID (PRI, int, auto increment), primeIndex(int), multiPrimeNum (int)
+# - mersennePrimes: mersennePrimeID (PRI, int, auto increment), userID (varchar), primeIndex (int), mersennePrimeNum (int)
+# - usersLogged: userID (varchar), IPAddr (varchar), loggedIn (varchar), timeIn (time), timeLogged (time), primesFound (int)
+def multiSaveMersenne(newTest):
+    userName = hostName()
+    #generate sql to insert new prime
+    sqlInput = "INSERT INTO mersennePrimes (userID, mersennePrimeNum) VALUES ('"+ userName[0] + "', " + str(newTest) + ");"
+    multiUpdate(sqlInput)
+
 
 # -------------------------------------------------------------------------------------
 # Functions for generating side scroller game
@@ -257,45 +415,7 @@ def generateField(field, prime, width, height):
 
     return field
 
-#function to input field, and display it on the screen
-def renderFieldOld(field, width, prime, height):
-    """
-    field  : list[int]
-    width  : int
-    prime  : int
-   height : int   # number of bits sampled from prime
-    """
-
-    # Clear screen
-    os.system("cls" if os.name == "nt" else "clear")
-
-    # Count 1s in the lowest `height` bits of the prime
-    ones = sum((prime >> i) & 1 for i in range(height))
-
-    # Choose color
-    if ones <= 3:
-        color = "\033[94m"   # blue (water)
-    else:
-        color = "\033[92m"   # green (land)
-
-    RESET = "\033[0m"
-    BLOCK = f"{color}█{RESET}"
-
-    # Render top to bottom
-    for row in field:
-        line = format(row, f"0{width}b")
-        rendered = ""
-        for bit in line:
-            if bit == "1":
-                rendered += BLOCK
-            else:
-                rendered += " "
-        print(rendered)
-
-    print("-" * width)
-    print(f"Last prime: {prime}  |  ones: {ones}")
-
-
+#function to render the field onto the screen
 def renderField(field, width, prime):
     import os
 
@@ -330,7 +450,6 @@ def renderField(field, width, prime):
     print(f"Last prime: {prime}")
 
 
-
 # ------------------
 # main program start
 # ------------------
@@ -338,15 +457,19 @@ def renderField(field, width, prime):
 #create task variables attached to functions
 calculatingTask = threading.Thread(target=calculating, name='calculatingTask')
 inputTask = threading.Thread(target=userInput, name='inputTask')
+visualizationTask = threading.Thread(target=visualizationLoop, name='screeTask')
 
-#start a task for calculating, and a task to look for user input 'q' to quit the program
+#start a task for calculating, updating the screen, and a task to look for user input 'q' to quit the program
 print("Calculating task starting.\n")
 calculatingTask.start()
 print("Looking for user input task starting.\n")
 inputTask.start()
+print("starting the screen task")
+visualizationTask.start()
 
-#once both concurrent tasks end, we continue.
+#once all concurrent tasks end, we continue.
 calculatingTask.join()
 inputTask.join()
+visualizationTask.join()
 
 print("all tasks complete.\n")
