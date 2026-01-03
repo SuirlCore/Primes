@@ -46,6 +46,8 @@ userNameInput = input()
 def calculating():
     print("Start Calculating\n")
 
+    field = None
+
     while True:
         #get the next range
         newTestRange = multiLoadRange()
@@ -62,8 +64,8 @@ def calculating():
                     divisors = divisors + 1
             if divisors <= 1:
                 multiSavePrime(newTest)
-                field = generateField(field, newTest, 24)
-                renderField(field, 24, newTest, 8)
+                field = generateField(field, newTest, 100, 8)
+                renderField(field, 100, newTest)
 
             
         #ends this task if the userInput task is not still running
@@ -72,10 +74,10 @@ def calculating():
 
 #look for the q key to be pressed, and end the task
 def userInput():
+    print("Start looking for input\n")
     while True:
         if keyboard.is_pressed('q'):
             break
-
 
 # -------------------------------------------------------------------------------------
 # Functions for multi user loading, holding spot, and saving primes to MariaDB database
@@ -214,21 +216,8 @@ def multiSavePrime(newTest):
     userName = hostName()
     #generate sql to insert new prime
     sqlInput = "INSERT INTO multiPrimes (userID, multiPrimeNum) VALUES ('"+ userName[0] + "', " + str(newTest) + ");"
-
-    #calculate whether this prime is a mersenne prime, and insert it into the database if it is
-    mersenneTest = 2^newTest-1
-    x = 0
-    divisors = 0
-    while (x < (mersenneTest / 2)) and (divisors <= 1):
-        x = x + 1
-        if newTest % x == 0:
-            divisors = divisors + 1
-    if divisors <= 1:
-        multiSavePrime(newTest)
-
-
     multiUpdate(sqlInput)
-
+    
 
 # -------------------------------------------------------------------------------------
 # Functions for generating side scroller game
@@ -269,12 +258,12 @@ def generateField(field, prime, width, height):
     return field
 
 #function to input field, and display it on the screen
-def renderField(field, width, prime, height):
+def renderFieldOld(field, width, prime, height):
     """
     field  : list[int]
     width  : int
     prime  : int
-    height : int   # number of bits sampled from prime
+   height : int   # number of bits sampled from prime
     """
 
     # Clear screen
@@ -305,6 +294,41 @@ def renderField(field, width, prime, height):
 
     print("-" * width)
     print(f"Last prime: {prime}  |  ones: {ones}")
+
+
+def renderField(field, width, prime):
+    import os
+
+    os.system("cls" if os.name == "nt" else "clear")
+
+    height = len(field)
+
+    BLUE  = "\033[94m"
+    GREEN = "\033[92m"
+    RESET = "\033[0m"
+
+    # Pre-calc column densities
+    column_ones = [0] * width
+    for row in field:
+        for x in range(width):
+            if (row >> (width - 1 - x)) & 1:
+                column_ones[x] += 1
+
+    # Render top → bottom
+    for y in range(height):
+        line = ""
+        for x in range(width):
+            bit = (field[y] >> (width - 1 - x)) & 1
+            if bit:
+                color = BLUE if column_ones[x] <= 3 else GREEN
+                line += f"{color}█{RESET}"
+            else:
+                line += " "
+        print(line)
+
+    print("-" * width)
+    print(f"Last prime: {prime}")
+
 
 
 # ------------------
