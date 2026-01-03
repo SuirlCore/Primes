@@ -128,23 +128,27 @@ def calculating():
         #actual calculating
         while newTest <= (newTestRange + 100):
             newTest = newTest + 1
-            x = 0
-            divisors = 0
-            while (x < (newTest / 2)) and (divisors <= 1):
-                x = x + 1
-                if newTest % x == 0:
-                    divisors = divisors + 1
-            if divisors <= 1:
-                multiSavePrime(newTest)
+            
+            if newTest < 2:
+                continue
 
-                p = newTest  # your prime
+            is_prime = True
+            for x in range(2, int(newTest ** 0.5) + 1):
+                if newTest % x == 0:
+                    is_prime = False
+                    break
+
+            if is_prime:
+                print("new prime found")
+                multiSavePrime(newTest)
+                display_queue.put((newTest, time.perf_counter()))
+
+                #check if its a mesenne prime
+                p = newTest
 
                 if p > 0 and ((p + 1) & p) == 0:
                     multiSaveMersenne(newTest)
-                    pass
-
-                display_queue.put((newTest, time.perf_counter()))
-
+                    pass           
             
         #ends this task if the userInput task is not still running
         if inputTask.is_alive() == False:
@@ -206,7 +210,6 @@ def visualizationLoop(width=100, height=8, fps=30, buffer_size=200):
                 field,
                 width,
                 last_rendered_prime if last_rendered_prime else 0,
-                height
             )
 
         # Frame timing
@@ -457,7 +460,7 @@ def renderField(field, width, prime):
 #create task variables attached to functions
 calculatingTask = threading.Thread(target=calculating, name='calculatingTask')
 inputTask = threading.Thread(target=userInput, name='inputTask')
-visualizationTask = threading.Thread(target=visualizationLoop, name='screeTask')
+#visualizationTask = threading.Thread(target=visualizationLoop, name='screeTask')
 
 #start a task for calculating, updating the screen, and a task to look for user input 'q' to quit the program
 print("Calculating task starting.\n")
@@ -465,11 +468,11 @@ calculatingTask.start()
 print("Looking for user input task starting.\n")
 inputTask.start()
 print("starting the screen task")
-visualizationTask.start()
+#visualizationTask.start()
 
 #once all concurrent tasks end, we continue.
 calculatingTask.join()
 inputTask.join()
-visualizationTask.join()
+#visualizationTask.join()
 
 print("all tasks complete.\n")
