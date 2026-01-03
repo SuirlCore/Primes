@@ -9,6 +9,7 @@ import sys
 import queue
 import time
 from collections import deque
+import curses
 
 
 display_queue = queue.Queue()
@@ -146,88 +147,140 @@ def calculating(databaseHost):
                     break
 
             if is_prime:
-                print("new prime found")
                 multiSavePrime(newTest, databaseHost)
-                display_queue.put((newTest, time.perf_counter()))
 
                 #check if its a mesenne prime
                 p = newTest
 
                 if p > 0 and ((p + 1) & p) == 0:
-                    multiSaveMersenne(newTest, databaseHost)
-                    pass           
-            
+                    multiSaveMersenne(p, databaseHost)
+                    display_queue.put((p, True, time.perf_counter()))
+                else:
+                    display_queue.put((p, False, time.perf_counter()))
+
+                    
         #ends this task if the userInput task is not still running
         if inputTask.is_alive() == False:
             break
 
 #function for updating the screen and playing the runner
-def visualizationLoop(width=100, height=8, fps=30, buffer_size=200):
-    field = None
+def visualizationLoop(width=100, height=20, fps=30, buffer_size=200):
+    """
+    A curses-based visualization for prime runner.
+    - width, height: terminal field size
+    - fps: frames per second
+    - buffer_size: number of primes to buffer for scrolling
+    """
+    # Initialize curses
+    stdscr = curses.initscr()
+    curses.start_color()
+    curses.use_default_colors()
+    curses.curs_set(0)  # hide cursor
+    stdscr.nodelay(True)  # non-blocking input
+    stdscr.keypad(True)
 
+    # Define color pairs
+    curses.init_pair(1, curses.COLOR_BLUE, -1)    # terrain low density
+    curses.init_pair(2, curses.COLOR_GREEN, -1)   # terrain high density
+    curses.init_pair(3, curses.COLOR_YELLOW, -1)  # Mersenne prime overlay
+
+    # Field layers
+    field = [0] * height
+    cap_mask = [0] * height  # persistent Mersenne primes
+
+    # Queues and timing
     prime_buffer = deque(maxlen=buffer_size)
-    prime_times = deque(maxlen=20)      # for rolling average
+    prime_times = deque(maxlen=20)
     intervals = deque(maxlen=20)
-
-    last_rendered_prime = None
+    last_rendered_prime = 0
     scroll_accumulator = 0.0
+    frame_time = 1.0 / fps
 
-    FRAME_TIME = 1.0 / fps
+    try:
+        while True:
+            frame_start = time.perf_counter()
 
-    while True:
+            # Check for quit
+            try:
+                key = stdscr.getch()
+                if key == ord('q'):
+                    break
+            except:
+                pass
 
-        frame_start = time.perf_counter()
+            # Drain primes from queue
+            try:
+                while True:
+                    prime, is_mersenne, timestamp = display_queue.get_nowait()
+                    prime_buffer.append((prime, is_mersenne))
+                    if prime_times:
+                        intervals.append(timestamp - prime_times[-1])
+                    prime_times.append(timestamp)
+            except queue.Empty:
+                pass
 
-        # Drain incoming messages
-        try:
-            while True:
-                prime, timestamp = display_queue.get_nowait()
-                prime_buffer.append(prime)
-
-                if prime_times:
-                    intervals.append(timestamp - prime_times[-1])
-                prime_times.append(timestamp)
-        except queue.Empty:
-            pass
-
-        # Determine scroll speed
-        if intervals:
-            avg_interval = sum(intervals) / len(intervals)
-            columns_per_second = max(1.0, min(10.0, 1.0 / avg_interval))
-        else:
-            columns_per_second = 1.0
-
-        scroll_accumulator += columns_per_second * FRAME_TIME
-
-        # Advance field
-        while scroll_accumulator >= 1.0:
-            scroll_accumulator -= 1.0
-
-            if prime_buffer:
-                prime = prime_buffer.popleft()
-                last_rendered_prime = prime
-                field = generateField(field, prime, width, height)
+            # Determine scroll speed dynamically
+            if intervals:
+                avg_interval = sum(intervals) / len(intervals)
+                columns_per_second = max(1.0, min(10.0, 1.0 / avg_interval))
             else:
-                # No new prime — coast terrain
-                field = generateField(field, 0, width, height)
+                columns_per_second = 1.0
 
-        # Render
-        if field is not None:
-            renderField(
-                field,
-                width,
-                last_rendered_prime if last_rendered_prime else 0,
-            )
+            scroll_accumulator += columns_per_second * frame_time
 
-        # Frame timing
-        elapsed = time.perf_counter() - frame_start
-        sleep_time = FRAME_TIME - elapsed
-        if sleep_time > 0:
-            time.sleep(sleep_time)
+            # Advance terrain
+            while scroll_accumulator >= 1.0:
+                scroll_accumulator -= 1.0
 
-        #ends this task if the userInput task is not still running
-        if inputTask.is_alive() == False:
-            break
+                # Shift field and cap_mask left by one
+                mask = (1 << width) - 1
+                field = [(row << 1) & mask for row in field]
+                cap_mask = [(row << 1) & mask for row in cap_mask]
+
+                # Add new prime column
+                if prime_buffer:
+                    prime, is_mersenne = prime_buffer.popleft()
+                    last_rendered_prime = prime
+                    bits = [(prime >> i) & 1 for i in range(height)]
+                    bits.reverse()
+                    for y in range(height):
+                        field[y] |= bits[y]
+                        if is_mersenne and bits[y]:
+                            cap_mask[y] |= 1
+
+            # Render
+            stdscr.erase()
+            for y in range(height):
+                for x in range(width):
+                    bit_index = width - 1 - x
+                    # Mersenne overlay has priority
+                    if (cap_mask[y] >> bit_index) & 1:
+                        stdscr.addstr(y, x, '█', curses.color_pair(3))
+                    elif (field[y] >> bit_index) & 1:
+                        color = curses.color_pair(1) if bin(field[y]).count("1") <= 3 else curses.color_pair(2)
+                        stdscr.addstr(y, x, '█', color)
+            # Draw bottom line and last prime
+            try:
+                stdscr.addstr(height, 0, "-" * width)
+                stdscr.addstr(height + 1, 0, f"Last prime: {last_rendered_prime}")
+            except curses.error:
+                # Some terminals might not allow writing past screen size
+                pass
+
+            stdscr.refresh()
+
+            # Frame pacing
+            elapsed = time.perf_counter() - frame_start
+            sleep_time = frame_time - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+            # Stop if calculating task finished
+            if not inputTask.is_alive():
+                break
+
+    finally:
+        curses.endwin()
 
 #look for the q key to be pressed, and end the task
 def userInput():
@@ -395,62 +448,61 @@ def multiSaveMersenne(newTest, databaseHost):
 
 #function to generate a moving field based on the last prime entered
 def generateField(field, prime, width, height):
-    """
-    field  : list[int] | None
-    prime  : int
-    width  : int
-    height : int
-    """
 
-    # Initialize empty field if this is the first run
+    # Initialize field if first run
     if field is None:
         field = [0] * height
 
-    # 1. Scroll field left
     mask = (1 << width) - 1
+
+    # Scroll terrain left
     field = [(row << 1) & mask for row in field]
 
-    # 2. Sample ONLY the lowest `height` bits of the prime
+    # Convert prime to column bits
     bits = [(prime >> i) & 1 for i in range(height)]
+    bits.reverse()  # bottom to top
 
-    # 3. Flip vertically
-    bits.reverse()
-
-    # 4. Gravity: pack 1s at bottom
     ones = sum(bits)
     new_column = [0] * (height - ones) + [1] * ones
 
-    # 5. Insert column
-    for row_index in range(height):
-        field[row_index] |= new_column[row_index]
+    # Add new column to rightmost bit
+    for y in range(height):
+        field[y] |= new_column[y]
 
-    return field
+    return field, ones  # return ones for potential Mersenne cap
 
 #function to render the field onto the screen
-def renderField(field, width, prime):
+def renderField(field, width, prime, cap_mask=None):
     import os
-
     os.system("cls" if os.name == "nt" else "clear")
 
     height = len(field)
 
-    BLUE  = "\033[94m"
-    GREEN = "\033[92m"
-    RESET = "\033[0m"
+    BLUE   = "\033[94m"
+    GREEN  = "\033[92m"
+    YELLOW = "\033[93m"
+    RESET  = "\033[0m"
 
-    # Pre-calc column densities
+    # Pre-calc terrain densities
     column_ones = [0] * width
     for row in field:
         for x in range(width):
             if (row >> (width - 1 - x)) & 1:
                 column_ones[x] += 1
 
-    # Render top → bottom
+    # Render each row
     for y in range(height):
         line = ""
         for x in range(width):
-            bit = (field[y] >> (width - 1 - x)) & 1
-            if bit:
+            bit_index = width - 1 - x
+
+            # Mersenne overlay has priority
+            if cap_mask and ((cap_mask[y] >> bit_index) & 1):
+                line += f"{YELLOW}█{RESET}"
+                continue
+
+            # Terrain rendering
+            if (field[y] >> bit_index) & 1:
                 color = BLUE if column_ones[x] <= 3 else GREEN
                 line += f"{color}█{RESET}"
             else:
@@ -460,15 +512,15 @@ def renderField(field, width, prime):
     print("-" * width)
     print(f"Last prime: {prime}")
 
-
 # ------------------
 # main program start
 # ------------------
 
+
 #create task variables attached to functions
 calculatingTask = threading.Thread(target=calculating, args=(databaseHost,), name='calculatingTask')
 inputTask = threading.Thread(target=userInput, name='inputTask')
-#visualizationTask = threading.Thread(target=visualizationLoop, name='screeTask')
+visualizationTask = threading.Thread(target=visualizationLoop, name='screeTask')
 
 #start a task for calculating, updating the screen, and a task to look for user input 'q' to quit the program
 print("Calculating task starting.\n")
@@ -476,11 +528,11 @@ calculatingTask.start()
 print("Looking for user input task starting.\n")
 inputTask.start()
 print("starting the screen task")
-#visualizationTask.start()
+visualizationTask.start()
 
 #once all concurrent tasks end, we continue.
 calculatingTask.join()
 inputTask.join()
-#visualizationTask.join()
+visualizationTask.join()
 
 print("all tasks complete.\n")
