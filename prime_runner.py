@@ -179,10 +179,25 @@ def visualizationLoop(width=100, height=20, fps=30, buffer_size=200):
     stdscr.nodelay(True)  # non-blocking input
     stdscr.keypad(True)
 
-    # Define color pairs
-    curses.init_pair(1, curses.COLOR_BLUE, -1)    # terrain low density
-    curses.init_pair(2, curses.COLOR_GREEN, -1)   # terrain high density
-    curses.init_pair(3, curses.COLOR_YELLOW, -1)  # Mersenne prime overlay
+    # Colors
+    if curses.can_change_color():
+        # Define colors (0-1000 scale)
+        curses.init_color(10, 530, 810, 980)  # soft sky blue
+        curses.init_color(11, 200, 400, 800)  # water blue
+        curses.init_color(12, 200, 700, 300)  # grass green
+        curses.init_color(13, 1000, 900, 400) # mellow yellow
+
+        # Assign color pairs: foreground = terrain, background = sky
+        curses.init_pair(1, 11, 10)  # water blue on sky blue
+        curses.init_pair(2, 12, 10)  # grass green on sky blue
+        curses.init_pair(3, 13, 10)  # yellow on sky blue
+        curses.init_pair(4, 10, 0)   # sky: sky blue on black for visibility
+    else:
+        # fallback for terminals that can't change colors
+        curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(4, curses.COLOR_CYAN, curses.COLOR_BLACK)
 
     # Field layers
     field = [0] * height
@@ -195,6 +210,8 @@ def visualizationLoop(width=100, height=20, fps=30, buffer_size=200):
     last_rendered_prime = 0
     scroll_accumulator = 0.0
     frame_time = 1.0 / fps
+
+    BIT_WINDOW = 8
 
     try:
         while True:
@@ -241,24 +258,51 @@ def visualizationLoop(width=100, height=20, fps=30, buffer_size=200):
                 if prime_buffer:
                     prime, is_mersenne = prime_buffer.popleft()
                     last_rendered_prime = prime
-                    bits = [(prime >> i) & 1 for i in range(height)]
-                    bits.reverse()
+
+                    # Sample lowest `height` bits
+                    ones = bin(prime & ((1 << BIT_WINDOW) - 1)).count("1")
+                    ones = min(ones, height)
+
+                    # Build gravity column
+                    column = [0] * (height - ones) + [1] * ones
+
                     for y in range(height):
-                        field[y] |= bits[y]
-                        if is_mersenne and bits[y]:
-                            cap_mask[y] |= 1
+                        if column[y]:
+                            field[y] |= 1
+
+                    # Mersenne cap goes on TOP of the column
+                    if is_mersenne and ones > 0:
+                        cap_row = height - ones
+                        cap_mask[cap_row] |= 1
+
+            # Precompute column heights
+            column_heights = [0] * width
+            for x in range(width):
+                bit_index = width - 1 - x
+                for y in range(height):
+                    if (field[y] >> bit_index) & 1:
+                        column_heights[x] += 1
 
             # Render
             stdscr.erase()
             for y in range(height):
                 for x in range(width):
                     bit_index = width - 1 - x
-                    # Mersenne overlay has priority
+                    col_height = column_heights[x]
+                    top_of_column = height - col_height
+
                     if (cap_mask[y] >> bit_index) & 1:
-                        stdscr.addstr(y, x, '█', curses.color_pair(3))
-                    elif (field[y] >> bit_index) & 1:
-                        color = curses.color_pair(1) if bin(field[y]).count("1") <= 3 else curses.color_pair(2)
-                        stdscr.addstr(y, x, '█', color)
+                        stdscr.addstr(y, x, '█', curses.color_pair(3))  # Mersenne cap
+                    elif y >= top_of_column:
+                        # Decide low/high terrain
+                        if col_height <= 3:
+                            stdscr.addstr(y, x, '█', curses.color_pair(1))  # water
+                        else:
+                            stdscr.addstr(y, x, '█', curses.color_pair(2))  # grass
+                    else:
+                        stdscr.addstr(y, x, ' ', curses.color_pair(4))  # sky
+
+
             # Draw bottom line and last prime
             try:
                 stdscr.addstr(height, 0, "-" * width)
